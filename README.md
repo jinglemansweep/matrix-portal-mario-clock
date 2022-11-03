@@ -1,8 +1,7 @@
 # Matrix Portal M4 MQTT Display
 
 An experimental LED matrix display using the [AdaFruit Matrix Portal M4](https://www.adafruit.com/product/4745) 
-controller and a [64x32 MOD75 LED Matrix Panel](https://www.adafruit.com/product/2279), controlled via [MQTT](https://en.wikipedia.org/wiki/MQTT) 
-for use with IoT and Home Automation projects such as [Home Assistant](https://www.home-assistant.io/)
+controller and a [64x32 MOD75 LED Matrix Panel](https://www.adafruit.com/product/2279), controlled via [MQTT](https://en.wikipedia.org/wiki/MQTT) for use with IoT and Home Automation projects such as [Home Assistant](https://www.home-assistant.io/).
 
 ![Photo](./docs/images/led-matrix-jms.png)
 
