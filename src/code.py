@@ -32,6 +32,8 @@ import adafruit_lis3dh
 
 # supervisor.disable_autoreload()
 
+print("BOOT")
+
 try:
     from secrets import secrets
 except ImportError:
@@ -70,17 +72,10 @@ DISPLAY.rotation = (int(((math.atan2(-ACCEL.acceleration.y,
                                      -ACCEL.acceleration.x) + math.pi) /
                          (math.pi * 2) + 0.875) * 4) % 4) * 90
 
-LARGE_FONT = bitmap_font.load_font('/fonts/helvB12.bdf')
-SMALL_FONT = bitmap_font.load_font('/fonts/helvR10.bdf')
-SYMBOL_FONT = bitmap_font.load_font('/fonts/6x10.bdf')
-LARGE_FONT.load_glyphs('0123456789:')
-SMALL_FONT.load_glyphs('0123456789:/.%')
-SYMBOL_FONT.load_glyphs('\u21A5\u21A7')
-
 slides = [
-    build_bitmap_group('/dogs.bmp'),
-    build_bitmap_group('/louis.bmp'),
-    build_bitmap_group('/couple.bmp'),
+    build_bitmap_group('photos/dogs.bmp'),
+    build_bitmap_group('photos/louis.bmp'),
+    build_bitmap_group('photos/couple.bmp'),
 ]
   
 # NETWORK = Network(status_neopixel=board.NEOPIXEL, debug=False)
