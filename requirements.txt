@@ -1,0 +1,10 @@
+adafruit_fakerequests==1.0.11
+adafruit_lis3dh==5.1.18
+adafruit_bitmap_font==1.5.11
+adafruit_bus_device==5.2.3
+adafruit_display_text==2.22.12
+adafruit_esp32spi==5.0.5
+adafruit_io==5.6.12
+adafruit_matrixportal==3.0.10
+adafruit_minimqtt==5.5.2
+adafruit_portalbase==1.14.4
