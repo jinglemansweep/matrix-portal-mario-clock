@@ -1,4 +1,5 @@
 import gc
+import random
 import time
 import math
 import board
@@ -32,36 +33,48 @@ BITPLANES = 6  # Ideally 6, but can set lower if RAM is tight
 # SOME UTILITY FUNCTIONS AND CLASSES ---------------------------------------
 
 
-def build_rect(x, y, w, h, border=False, color_bg=0x000000, color_border=0xFFFFFF):
+def build_rect(
+    x, y, w, h, border=False, rounded=False, color_bg=None, color_border=0xFFFFFF
+):
     # Create temporary bitmap and 2 color palette
-    bitmap = displayio.Bitmap(w, h, 2)
-    palette = displayio.Palette(2)
-    palette[0] = color_bg
-    palette[1] = color_border
+    bitmap = displayio.Bitmap(w, h, 3)
+    palette = displayio.Palette(3)
+    palette.make_transparent(0)
+    palette[0] = 0xFF00FF
+    palette[1] = color_bg if color_bg is not None else 0x000000
+    palette[2] = color_border
     # Fill background
     for by in range(h):
         for bx in range(w):
-            bitmap[bx, by] = 0
+            bitmap[bx, by] = 1 if color_bg is not None else 0
     # Border
     if border:
         for bx in range(w):
-            bitmap[bx, 0] = 1
-            bitmap[bx, h - 1] = 1
+            bitmap[bx, 0] = 2
+            bitmap[bx, h - 1] = 2
         for by in range(h):
-            bitmap[0, by] = 1
-            bitmap[w - 1, by] = 1
+            bitmap[0, by] = 2
+            bitmap[w - 1, by] = 2
+    # Rounded corners
+    if rounded:
+        bitmap[0, 0] = 0
+        bitmap[0, h - 1] = 0
+        bitmap[w - 1, 0] = 0
+        bitmap[w - 1, h - 1] = 0
     tilegrid = displayio.TileGrid(bitmap, pixel_shader=palette)
     tilegrid.x = x
     tilegrid.y = y
     return tilegrid
 
 
-def build_bitmap(bitmap_file, brightness=0.1, gamma=1.0, normalize=True):
+def build_bitmap(x, y, bitmap_file, brightness=0.1, gamma=1.0, normalize=True):
     bitmap, palette = adafruit_imageload.load(
         bitmap_file, bitmap=displayio.Bitmap, palette=displayio.Palette
     )
     bitmap_faded = PaletteFader(palette, brightness, gamma, normalize)
     tilegrid = displayio.TileGrid(bitmap, pixel_shader=bitmap_faded.palette)
+    tilegrid.x = x
+    tilegrid.y = y
     return tilegrid
 
 
@@ -94,9 +107,28 @@ DISPLAY.rotation = (
 root_group = displayio.Group()
 
 group1 = displayio.Group()
-# group1.append(build_bitmap("photos/louis-closeup.bmp"))
-group1.append(build_rect(0, 0, 64, 32, color_bg=0x080000))
-group1.append(build_rect(2, 4, 60, 12, border=True, color_border=0x111100))
+# group1.append(build_bitmap(0, 0, "photos/8bit-house.bmp"))
+group1.append(build_bitmap(0, 23, "photos/mario-brick.bmp"))
+group1.append(build_bitmap(8, 23, "photos/mario-brick.bmp"))
+group1.append(build_bitmap(16, 23, "photos/mario-brick.bmp"))
+group1.append(build_bitmap(24, 23, "photos/mario-brick.bmp"))
+group1.append(build_bitmap(32, 23, "photos/mario-brick.bmp"))
+group1.append(build_bitmap(40, 23, "photos/mario-brick.bmp"))
+group1.append(build_bitmap(48, 23, "photos/mario-brick.bmp"))
+group1.append(build_bitmap(56, 23, "photos/mario-brick.bmp"))
+# group1.append(build_rect(0, 0, 64, 32, color_bg=0x080000))
+group1.append(
+    build_rect(
+        2,
+        4,
+        60,
+        12,
+        border=True,
+        rounded=True,
+        color_bg=0x070000,
+        color_border=0x111100,
+    )
+)
 group1.append(build_text(5, 9, "HISS HISS", color=0x111111))
 
 root_group.append(group1)
@@ -106,9 +138,16 @@ root_group.append(group1)
 
 # MAIN LOOP ----------------------------------------------------------------
 
+tick = 0
+DISPLAY.show(root_group)
+
+bg_x, bg_y = root_group[0][0].x, root_group[0][0].y
+
 while True:
     gc.collect()
     NOW = time.time()
-    DISPLAY.show(root_group)
-    DISPLAY.refresh()
-    time.sleep(2)
+    # root_group[0][3].text = "{0:9d}".format(tick)
+    # root_group[0][0].x = bg_x + random.choice([-1, 1])
+    # root_group[0][0].y = bg_y + random.choice([-1, 1])
+    # DISPLAY.refresh()
+    tick = tick + 1
