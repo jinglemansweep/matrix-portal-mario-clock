@@ -4,6 +4,8 @@ declare -r script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &> /dev/null 
 declare -r base_dir="${script_dir}/.."
 declare -r dest_dir="${1:-/media/${USER}/CIRCUITPY}"
 
+source "${base_dir}/venv/bin/activate"
+
 echo "Deploying to Matrix Portal..."
 echo
 echo "Source Path:    ${base_dir}"

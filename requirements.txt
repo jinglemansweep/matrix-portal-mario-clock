@@ -5,6 +5,8 @@ adafruit_bus_device==5.2.3
 adafruit_display_text==2.22.12
 adafruit_esp32spi==5.0.5
 adafruit_io==5.6.12
+adafruit_imageload
 adafruit_matrixportal==3.0.10
 adafruit_minimqtt==5.5.2
 adafruit_portalbase==1.14.4
+cedargrove_palettefader
