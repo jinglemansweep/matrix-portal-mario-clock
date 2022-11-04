@@ -67,6 +67,38 @@ def build_rect(
     return tilegrid
 
 
+def build_sprites(
+    x,
+    y,
+    bitmap_file,
+    w,
+    h,
+    tile,
+    tile_width=16,
+    tile_height=16,
+    brightness=0.1,
+    gamma=1.0,
+    normalize=True,
+):
+    bitmap, palette = adafruit_imageload.load(
+        bitmap_file, bitmap=displayio.Bitmap, palette=displayio.Palette
+    )
+    palette.make_transparent(255)
+    bitmap_faded = PaletteFader(palette, brightness, gamma, normalize)
+    tilegrid = displayio.TileGrid(
+        bitmap,
+        pixel_shader=bitmap_faded.palette,
+        width=w,
+        height=h,
+        tile_width=tile_width,
+        tile_height=tile_height,
+        default_tile=tile,
+    )
+    tilegrid.x = x
+    tilegrid.y = y
+    return tilegrid
+
+
 def build_bitmap(x, y, bitmap_file, brightness=0.1, gamma=1.0, normalize=True):
     bitmap, palette = adafruit_imageload.load(
         bitmap_file, bitmap=displayio.Bitmap, palette=displayio.Palette
@@ -107,21 +139,15 @@ DISPLAY.rotation = (
 root_group = displayio.Group()
 
 group1 = displayio.Group()
-# group1.append(build_bitmap(0, 0, "photos/8bit-house.bmp"))
-group1.append(build_bitmap(0, 23, "photos/mario-brick.bmp"))
-group1.append(build_bitmap(8, 23, "photos/mario-brick.bmp"))
-group1.append(build_bitmap(16, 23, "photos/mario-brick.bmp"))
-group1.append(build_bitmap(24, 23, "photos/mario-brick.bmp"))
-group1.append(build_bitmap(32, 23, "photos/mario-brick.bmp"))
-group1.append(build_bitmap(40, 23, "photos/mario-brick.bmp"))
-group1.append(build_bitmap(48, 23, "photos/mario-brick.bmp"))
-group1.append(build_bitmap(56, 23, "photos/mario-brick.bmp"))
-# group1.append(build_rect(0, 0, 64, 32, color_bg=0x080000))
+group1.append(build_sprites(0, 8, "/sprites.bmp", 1, 1, 0))
+group1.append(build_sprites(0, 24, "/sprites.bmp", 2, 1, 1))
+group1.append(build_sprites(48, 24, "/sprites.bmp", 1, 1, 2))
+
 group1.append(
     build_rect(
-        2,
-        4,
-        60,
+        30,
+        1,
+        33,
         12,
         border=True,
         rounded=True,
@@ -129,7 +155,7 @@ group1.append(
         color_border=0x111100,
     )
 )
-group1.append(build_text(5, 9, "HISS HISS", color=0x111111))
+group1.append(build_text(32, 6, "00:00", color=0x111111))
 
 root_group.append(group1)
 
