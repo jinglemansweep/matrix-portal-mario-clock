@@ -215,12 +215,15 @@ mario_sprite_idx = 0
 
 DISPLAY.show(g_root)
 
+gc.collect()
+
 while True:
-    gc.collect()
+
     NOW = rtc.datetime
     TICK = supervisor.ticks_ms()
     if last_ntp_check is None or time.monotonic() > last_ntp_check + 3600:
         try:
+            gc.collect()
             ntp_time = NETWORK.get_local_time()
             print("NTP Time", ntp_time)
             rtc.datetime = parse_time(ntp_time)
@@ -248,4 +251,4 @@ while True:
     if g_floor2.x < -64:
         g_floor2.x = 64
 
-    time.sleep(0.01)
+    time.sleep(0.001)
