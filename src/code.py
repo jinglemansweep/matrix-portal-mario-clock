@@ -26,6 +26,12 @@ except ImportError:
     print("WiFi secrets are kept in secrets.py, please add them there!")
     raise
 
+# CONSTANTS ----------------------------------------------------------------
+
+SPRITESHEET_FILENAME = "/sprites.bmp"
+SPRITESHEET_WIDTH = 3
+SPRITESHEET_HEIGHT = 1
+
 # CONFIGURABLE SETTINGS ----------------------------------------------------
 
 BITPLANES = 6  # Ideally 6, but can set lower if RAM is tight
@@ -67,26 +73,24 @@ def build_rect(
     return tilegrid
 
 
-def build_sprites(
+def build_sprite(
+    spritesheet,
+    palette,
     x,
     y,
-    bitmap_file,
-    w,
-    h,
     tile,
+    w=1,
+    h=1,
     tile_width=16,
     tile_height=16,
     brightness=0.1,
     gamma=1.0,
     normalize=True,
 ):
-    bitmap, palette = adafruit_imageload.load(
-        bitmap_file, bitmap=displayio.Bitmap, palette=displayio.Palette
-    )
     palette.make_transparent(255)
     bitmap_faded = PaletteFader(palette, brightness, gamma, normalize)
     tilegrid = displayio.TileGrid(
-        bitmap,
+        spritesheet,
         pixel_shader=bitmap_faded.palette,
         width=w,
         height=h,
@@ -136,28 +140,46 @@ DISPLAY.rotation = (
     % 4
 ) * 90
 
-root_group = displayio.Group()
+nes_font = bitmap_font.load_font("/nes.bdf")
 
-group1 = displayio.Group()
-group1.append(build_sprites(0, 8, "/sprites.bmp", 1, 1, 0))
-group1.append(build_sprites(0, 24, "/sprites.bmp", 2, 1, 1))
-group1.append(build_sprites(48, 24, "/sprites.bmp", 1, 1, 2))
+spritesheet, palette = adafruit_imageload.load(SPRITESHEET_FILENAME)
 
-group1.append(
-    build_rect(
-        30,
-        1,
-        33,
-        12,
-        border=True,
-        rounded=True,
-        color_bg=0x070000,
-        color_border=0x111100,
-    )
-)
-group1.append(build_text(32, 6, "00:00", color=0x111111))
 
-root_group.append(group1)
+g_root = displayio.Group()
+
+g_floor1 = displayio.Group()
+t_floor1brick1 = build_sprite(spritesheet, palette, 0, 24, 1, w=2)
+t_floor1brick2 = build_sprite(spritesheet, palette, 48, 24, 2)
+g_floor1.append(t_floor1brick1)
+g_floor1.append(t_floor1brick2)
+g_floor1.x = 0
+
+g_floor2 = displayio.Group()
+t_floor2brick1 = build_sprite(spritesheet, palette, 0, 24, 2, w=2)
+t_floor2brick2 = build_sprite(spritesheet, palette, 48, 24, 1)
+g_floor2.append(t_floor2brick1)
+g_floor2.append(t_floor2brick2)
+g_floor2.x = 64
+
+SPRITE_MARIO_STILL = 0
+SPRITE_MARIO_JUMP = 4
+SPRITE_MARIO_WALK1 = 5
+SPRITE_MARIO_WALK2 = 6
+SPRITE_MARIO_WALK3 = 7
+
+g_actors = displayio.Group()
+t_mario = build_sprite(spritesheet, palette, 0, 8, SPRITE_MARIO_STILL)
+g_actors.append(t_mario)
+
+g_clock = displayio.Group()
+t_counter = build_text(20, 6, "00", color=0x111111, font=nes_font)
+g_clock.append(t_counter)
+# g_clock.append(build_text(42, 6, "00", color=0x111111, font=nes_font))
+
+g_root.append(g_floor1)
+g_root.append(g_floor2)
+g_root.append(g_actors)
+g_root.append(g_clock)
 
 # NETWORK = Network(status_neopixel=board.NEOPIXEL, debug=False)
 # NETWORK.connect()
@@ -165,15 +187,29 @@ root_group.append(group1)
 # MAIN LOOP ----------------------------------------------------------------
 
 tick = 0
-DISPLAY.show(root_group)
-
-bg_x, bg_y = root_group[0][0].x, root_group[0][0].y
+mario_sprite_idx = 0
+DISPLAY.show(g_root)
 
 while True:
     gc.collect()
     NOW = time.time()
-    # root_group[0][3].text = "{0:9d}".format(tick)
-    # root_group[0][0].x = bg_x + random.choice([-1, 1])
-    # root_group[0][0].y = bg_y + random.choice([-1, 1])
-    # DISPLAY.refresh()
+    t_counter.text = "{0:4d}".format(tick)
+    g_floor1.x = g_floor1.x - 1
+    g_floor2.x = g_floor2.x - 1
+    t_mario[0] = SPRITE_MARIO_WALK1 + mario_sprite_idx
     tick = tick + 1
+
+    if tick > 9999:
+        tick = 0
+
+    if tick % 4 == 0:
+        mario_sprite_idx = mario_sprite_idx + 1
+        if mario_sprite_idx > 2:
+            mario_sprite_idx = 0
+
+    if g_floor1.x < -64:
+        g_floor1.x = 64
+    if g_floor2.x < -64:
+        g_floor2.x = 64
+
+    time.sleep(0.001)
