@@ -1,18 +1,20 @@
 import gc
-import random
 import time
 import math
 import board
 import busio
+import digitalio
 import displayio
 import terminalio
-import supervisor
 from rtc import RTC
-import adafruit_imageload
+from adafruit_bitmap_font import bitmap_font
+from adafruit_esp32spi import adafruit_esp32spi
+import adafruit_esp32spi.adafruit_esp32spi_socket as socket
 from adafruit_matrixportal.network import Network
 from adafruit_matrixportal.matrix import Matrix
-from adafruit_bitmap_font import bitmap_font
+from adafruit_ntp import NTP
 import adafruit_display_text.label
+import adafruit_imageload
 import adafruit_lis3dh
 from cedargrove_palettefader.palettefader import PaletteFader
 
@@ -26,8 +28,11 @@ except ImportError:
     print("WiFi secrets are kept in secrets.py, please add them there!")
     raise
 
+NETWORK = Network(status_neopixel=board.NEOPIXEL, debug=False)
+
 # CONSTANTS ----------------------------------------------------------------
 
+DEBUG = True
 SPRITESHEET_FILENAME = "/sprites.bmp"
 SPRITESHEET_WIDTH = 3
 SPRITESHEET_HEIGHT = 1
@@ -128,6 +133,7 @@ DISPLAY = MATRIX.display
 ACCEL = adafruit_lis3dh.LIS3DH_I2C(busio.I2C(board.SCL, board.SDA), address=0x19)
 _ = ACCEL.acceleration  # Dummy reading to blow out any startup residue
 time.sleep(0.1)
+
 DISPLAY.rotation = (
     int(
         (
@@ -172,8 +178,8 @@ t_mario = build_sprite(spritesheet, palette, 0, 8, SPRITE_MARIO_STILL)
 g_actors.append(t_mario)
 
 g_clock = displayio.Group()
-t_counter = build_text(20, 6, "00", color=0x111111, font=nes_font)
-g_clock.append(t_counter)
+t_hhmm = build_text(20, 6, "????", color=0x111111, font=nes_font)
+g_clock.append(t_hhmm)
 # g_clock.append(build_text(42, 6, "00", color=0x111111, font=nes_font))
 
 g_root.append(g_floor1)
@@ -181,19 +187,26 @@ g_root.append(g_floor2)
 g_root.append(g_actors)
 g_root.append(g_clock)
 
-# NETWORK = Network(status_neopixel=board.NEOPIXEL, debug=False)
-# NETWORK.connect()
-
 # MAIN LOOP ----------------------------------------------------------------
 
+DISPLAY.show(g_root)
+
+last_ntp_check = None
 tick = 0
 mario_sprite_idx = 0
-DISPLAY.show(g_root)
 
 while True:
     gc.collect()
-    NOW = time.time()
-    t_counter.text = "{0:4d}".format(tick)
+    NOW = time.localtime()  # Get the time values we need
+    if last_ntp_check is None or time.monotonic() > last_ntp_check + 3600:
+        try:
+            NETWORK.get_local_time()
+            last_ntp_check = time.monotonic()
+        except Exception as e:
+            print("NTP Error, retrying...", e)
+
+    hhmm = "{0:2d}{0:2d}".format(NOW.tm_hour, NOW.tm_min)
+    t_hhmm.text = hhmm
     g_floor1.x = g_floor1.x - 1
     g_floor2.x = g_floor2.x - 1
     t_mario[0] = SPRITE_MARIO_WALK1 + mario_sprite_idx
