@@ -3,22 +3,21 @@ import time
 import math
 import board
 import busio
-import digitalio
 import displayio
+import supervisor
 import terminalio
 from rtc import RTC
 from adafruit_bitmap_font import bitmap_font
-from adafruit_esp32spi import adafruit_esp32spi
-import adafruit_esp32spi.adafruit_esp32spi_socket as socket
 from adafruit_matrixportal.network import Network
 from adafruit_matrixportal.matrix import Matrix
-from adafruit_ntp import NTP
 import adafruit_display_text.label
 import adafruit_imageload
 import adafruit_lis3dh
 from cedargrove_palettefader.palettefader import PaletteFader
 
 # supervisor.disable_autoreload()
+
+displayio.release_displays()
 
 print("BOOT")
 
@@ -34,8 +33,6 @@ NETWORK = Network(status_neopixel=board.NEOPIXEL, debug=False)
 
 DEBUG = True
 SPRITESHEET_FILENAME = "/sprites.bmp"
-SPRITESHEET_WIDTH = 3
-SPRITESHEET_HEIGHT = 1
 
 # CONFIGURABLE SETTINGS ----------------------------------------------------
 
@@ -126,6 +123,26 @@ def build_text(x, y, text, color=0xFFFFFF, font=terminalio.FONT):
     return line
 
 
+def parse_time(timestring, is_dst=-1):
+    # 2022-11-04 21:46:57.174 308 5 +0000 UTC
+    bits = timestring.split(" ")
+    year_month_day = bits[0].split("-")
+    hour_minute_second = bits[1].split(":")
+    return time.struct_time(
+        (
+            int(year_month_day[0]),
+            int(year_month_day[1]),
+            int(year_month_day[2]),
+            int(hour_minute_second[0]),
+            int(hour_minute_second[1]),
+            int(hour_minute_second[2].split(".")[0]),
+            -1,
+            -1,
+            is_dst,
+        )
+    )
+
+
 # ONE-TIME INITIALIZATION --------------------------------------------------
 
 MATRIX = Matrix(bit_depth=BITPLANES)
@@ -147,9 +164,18 @@ DISPLAY.rotation = (
 ) * 90
 
 nes_font = bitmap_font.load_font("/nes.bdf")
-
+bitocra_font = bitmap_font.load_font("/bitocra7.bdf")
 spritesheet, palette = adafruit_imageload.load(SPRITESHEET_FILENAME)
 
+rtc = RTC()
+
+# DISPLAYIO PRIMITIVES -----------------------------------------------------
+
+SPRITE_MARIO_STILL = 0
+SPRITE_MARIO_JUMP = 4
+SPRITE_MARIO_WALK1 = 5
+SPRITE_MARIO_WALK2 = 6
+SPRITE_MARIO_WALK3 = 7
 
 g_root = displayio.Group()
 
@@ -167,19 +193,13 @@ g_floor2.append(t_floor2brick1)
 g_floor2.append(t_floor2brick2)
 g_floor2.x = 64
 
-SPRITE_MARIO_STILL = 0
-SPRITE_MARIO_JUMP = 4
-SPRITE_MARIO_WALK1 = 5
-SPRITE_MARIO_WALK2 = 6
-SPRITE_MARIO_WALK3 = 7
-
 g_actors = displayio.Group()
 t_mario = build_sprite(spritesheet, palette, 0, 8, SPRITE_MARIO_STILL)
 g_actors.append(t_mario)
 
 g_clock = displayio.Group()
-t_hhmm = build_text(20, 6, "????", color=0x111111, font=nes_font)
-g_clock.append(t_hhmm)
+t_hhmmss = build_text(32, 3, "??:??:??", color=0x111111, font=bitocra_font)
+g_clock.append(t_hhmmss)
 # g_clock.append(build_text(42, 6, "00", color=0x111111, font=nes_font))
 
 g_root.append(g_floor1)
@@ -189,33 +209,36 @@ g_root.append(g_clock)
 
 # MAIN LOOP ----------------------------------------------------------------
 
-DISPLAY.show(g_root)
-
 last_ntp_check = None
-tick = 0
+frame = 0
 mario_sprite_idx = 0
+
+DISPLAY.show(g_root)
 
 while True:
     gc.collect()
-    NOW = time.localtime()  # Get the time values we need
+    NOW = rtc.datetime
+    TICK = supervisor.ticks_ms()
     if last_ntp_check is None or time.monotonic() > last_ntp_check + 3600:
         try:
-            NETWORK.get_local_time()
+            ntp_time = NETWORK.get_local_time()
+            print("NTP Time", ntp_time)
+            rtc.datetime = parse_time(ntp_time)
             last_ntp_check = time.monotonic()
         except Exception as e:
             print("NTP Error, retrying...", e)
 
-    hhmm = "{0:2d}{0:2d}".format(NOW.tm_hour, NOW.tm_min)
-    t_hhmm.text = hhmm
+    hhmmss = "{:0>2d}:{:0>2d}:{:0>2d}".format(NOW.tm_hour, NOW.tm_min, NOW.tm_sec)
+    t_hhmmss.text = hhmmss
     g_floor1.x = g_floor1.x - 1
     g_floor2.x = g_floor2.x - 1
     t_mario[0] = SPRITE_MARIO_WALK1 + mario_sprite_idx
-    tick = tick + 1
+    frame = frame + 1
 
-    if tick > 9999:
-        tick = 0
+    if frame > 999:
+        frame = 0
 
-    if tick % 4 == 0:
+    if frame % 4 == 0:
         mario_sprite_idx = mario_sprite_idx + 1
         if mario_sprite_idx > 2:
             mario_sprite_idx = 0
@@ -225,4 +248,4 @@ while True:
     if g_floor2.x < -64:
         g_floor2.x = 64
 
-    time.sleep(0.001)
+    time.sleep(0.01)
