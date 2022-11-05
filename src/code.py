@@ -259,7 +259,11 @@ while True:
                 gc.collect()
                 ntp_time = NETWORK.get_local_time()
                 print("NTP Time", ntp_time)
-                RTC_INST.datetime = parse_time(ntp_time)
+                NOW = parse_time(ntp_time)
+                RTC_INST.datetime = NOW
+                ddmmyyyy = "{:0>2d}/{:0>2d}/{:0>4d}".format(
+                    NOW.tm_mday, NOW.tm_mon, NOW.tm_year
+                )
                 last_ntp_check = time.monotonic()
             except Exception as e:
                 print("NTP Error, retrying...", e)
