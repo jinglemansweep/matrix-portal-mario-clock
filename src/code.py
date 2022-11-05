@@ -35,7 +35,7 @@ SPRITESHEET_FILENAME = "/sprites.bmp"
 # CONFIGURABLE SETTINGS ----------------------------------------------------
 
 BITPLANES = 6  # Ideally 6, but can set lower if RAM is tight
-USE_NTP = False
+USE_NTP = True
 
 # SOME UTILITY FUNCTIONS AND CLASSES ---------------------------------------
 
