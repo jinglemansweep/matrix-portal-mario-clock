@@ -35,6 +35,7 @@ SPRITESHEET_FILENAME = "/sprites.bmp"
 # CONFIGURABLE SETTINGS ----------------------------------------------------
 
 BITPLANES = 6  # Ideally 6, but can set lower if RAM is tight
+USE_NTP = False
 
 # SOME UTILITY FUNCTIONS AND CLASSES ---------------------------------------
 
@@ -145,6 +146,7 @@ def parse_time(timestring, is_dst=-1):
 
 MATRIX = Matrix(bit_depth=BITPLANES)
 DISPLAY = MATRIX.display
+NETWORK = Network(status_neopixel=board.NEOPIXEL, debug=False)
 RTC_INST = RTC()
 ACCEL = adafruit_lis3dh.LIS3DH_I2C(busio.I2C(board.SCL, board.SDA), address=0x19)
 _ = ACCEL.acceleration  # Dummy reading to blow out any startup residue
@@ -162,9 +164,6 @@ DISPLAY.rotation = (
     )
     % 4
 ) * 90
-
-time.sleep(3)
-NETWORK = Network(status_neopixel=board.NEOPIXEL, debug=False)
 
 nes_font = bitmap_font.load_font("/nes.bdf")
 bitocra_font = bitmap_font.load_font("/bitocra7.bdf")
@@ -204,10 +203,15 @@ t_hhmmss = build_text(32, 3, "??:??:??", color=0x111111, font=bitocra_font)
 g_clock.append(t_hhmmss)
 # g_clock.append(build_text(42, 6, "00", color=0x111111, font=nes_font))
 
+g_debug = displayio.Group()
+t_debug = build_text(3, 3, "xxx", color=0x111111, font=bitocra_font)
+g_debug.append(t_debug)
+
 g_root.append(g_floor1)
 g_root.append(g_floor2)
 g_root.append(g_actors)
 g_root.append(g_clock)
+g_root.append(g_debug)
 
 # MAIN LOOP ----------------------------------------------------------------
 
@@ -227,21 +231,24 @@ gc.collect()
 while True:
 
     NOW = RTC_INST.datetime
-    TICK = supervisor.ticks_ms()
-    if last_ntp_check is None or time.monotonic() > last_ntp_check + 3600:
-        try:
-            gc.collect()
-            ntp_time = NETWORK.get_local_time()
-            print("NTP Time", ntp_time)
-            RTC_INST.datetime = parse_time(ntp_time)
-            last_ntp_check = time.monotonic()
-        except Exception as e:
-            print("NTP Error, retrying...", e)
+
+    if USE_NTP:
+        if last_ntp_check is None or time.monotonic() > last_ntp_check + 3600:
+            try:
+                gc.collect()
+                ntp_time = NETWORK.get_local_time()
+                print("NTP Time", ntp_time)
+                RTC_INST.datetime = parse_time(ntp_time)
+                last_ntp_check = time.monotonic()
+            except Exception as e:
+                print("NTP Error, retrying...", e)
 
     hhmmss = "{:0>2d}:{:0>2d}:{:0>2d}".format(NOW.tm_hour, NOW.tm_min, NOW.tm_sec)
     t_hhmmss.text = hhmmss
-    g_floor1.x = g_floor1.x - 1
-    g_floor2.x = g_floor2.x - 1
+
+    t_debug.text = "{}".format(frame % 64)
+
+    # Render Mario sprite
     if mario_is_jumping:
         t_mario[0] = SPRITE_MARIO_JUMP
     else:
@@ -278,13 +285,18 @@ while True:
         if mario_sprite_idx > 2:
             mario_sprite_idx = 0
 
-    # Reset floors after scrolled out
+    # Scroll floors to left
     if g_floor1.x <= -64:
-        g_floor1.x = 64
+        g_floor1.x = 63
+    else:
+        g_floor1.x = g_floor1.x - 1
+
     if g_floor2.x <= -64:
-        g_floor2.x = 64
+        g_floor2.x = 63
+    else:
+        g_floor2.x = g_floor2.x - 1
 
     # Incremeent frame index
     frame = frame + 1
 
-    time.sleep(0.02)
+    time.sleep(0.01 * ((60 - NOW.tm_sec) / 10))
