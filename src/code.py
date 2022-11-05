@@ -254,10 +254,6 @@ while True:
     else:
         t_mario[0] = SPRITE_MARIO_WALK1 + mario_sprite_idx
 
-    # Handle frame loop
-    if frame > 9999:
-        frame = 0
-
     # Trigger Mario Jump
     if frame % 64 == 28:
         if not mario_is_jumping:
@@ -286,17 +282,20 @@ while True:
             mario_sprite_idx = 0
 
     # Scroll floors to left
-    if g_floor1.x <= -64:
-        g_floor1.x = 63
+    if g_floor1.x <= -DISPLAY.width:
+        g_floor1.x = DISPLAY.width - 1
     else:
         g_floor1.x = g_floor1.x - 1
 
-    if g_floor2.x <= -64:
-        g_floor2.x = 63
+    if g_floor2.x <= -DISPLAY.width:
+        g_floor2.x = DISPLAY.width - 1
     else:
         g_floor2.x = g_floor2.x - 1
 
-    # Incremeent frame index
-    frame = frame + 1
+    # Increment frame index
+    if frame >= (DISPLAY.width * 4) - 1:
+        frame = 0
+    else:
+        frame = frame + 1
 
-    time.sleep(0.01 * ((60 - NOW.tm_sec) / 10))
+    # time.sleep(0.01 * ((60 - NOW.tm_sec) / 10))
