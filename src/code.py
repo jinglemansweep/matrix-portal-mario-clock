@@ -194,6 +194,10 @@ g_floor2.append(t_floor2brick1)
 g_floor2.append(t_floor2brick2)
 g_floor2.x = 64
 
+g_date = displayio.Group()
+t_ddmmyyyy = build_text(64, 15, "", color=0x001100, font=nes_font)
+g_date.append(t_ddmmyyyy)
+
 g_actors = displayio.Group()
 t_mario = build_sprite(spritesheet, palette, 0, 8, SPRITE_MARIO_STILL)
 g_actors.append(t_mario)
@@ -204,25 +208,39 @@ g_clock.append(t_hhmmss)
 # g_clock.append(build_text(42, 6, "00", color=0x111111, font=nes_font))
 
 g_debug = displayio.Group()
-t_debug = build_text(3, 3, "xxx", color=0x111111, font=bitocra_font)
+t_debug = build_text(3, 3, "", color=0x111111, font=bitocra_font)
 g_debug.append(t_debug)
 
 g_root.append(g_floor1)
 g_root.append(g_floor2)
+g_root.append(g_date)
 g_root.append(g_actors)
 g_root.append(g_clock)
 g_root.append(g_debug)
 
 # MAIN LOOP ----------------------------------------------------------------
 
+NOW = RTC_INST.datetime
+
 last_ntp_check = None
+gravity = 1.2
+scene_count = 16  # 16 displays (16 x 64 cols)
 frame = 0
+
+new_second = None
+new_minute = None
+new_hour = None
+
 mario_sprite_idx = 0
-gravity = 1
-mario_y_default = t_mario.y
-mario_jump_height = 9
+mario_y = mario_y_default = t_mario.y
+mario_jump_height = 12
+mario_is_walking = False
 mario_is_jumping = False
 mario_is_falling = False
+date_is_moving = False
+
+ddmmyyyy = "{:0>2d}/{:0>2d}/{:0>4d}".format(NOW.tm_mday, NOW.tm_mon, NOW.tm_year)
+hhmmss = "{:0>2d}:{:0>2d}:{:0>2d}".format(NOW.tm_hour, NOW.tm_min, NOW.tm_sec)
 
 DISPLAY.show(g_root)
 
@@ -230,7 +248,10 @@ gc.collect()
 
 while True:
 
+    ts = time.monotonic()
     NOW = RTC_INST.datetime
+    scene_frame = frame % DISPLAY.width
+    scene_index = frame // DISPLAY.width
 
     if USE_NTP:
         if last_ntp_check is None or time.monotonic() > last_ntp_check + 3600:
@@ -243,19 +264,33 @@ while True:
             except Exception as e:
                 print("NTP Error, retrying...", e)
 
-    hhmmss = "{:0>2d}:{:0>2d}:{:0>2d}".format(NOW.tm_hour, NOW.tm_min, NOW.tm_sec)
-    t_hhmmss.text = hhmmss
+    if new_second is None or ts > new_second + 1:
+        # print("NEW SECOND", new_second)
+        new_second = int(ts)
+        hhmmss = "{:0>2d}:{:0>2d}:{:0>2d}".format(NOW.tm_hour, NOW.tm_min, NOW.tm_sec)
+        t_hhmmss.text = hhmmss
 
-    t_debug.text = "{}".format(frame % 64)
+        if new_minute is None or NOW.tm_sec == 0:
+            # print("NEW MINUTE", new_minute)
+            new_minute = ts
 
-    # Render Mario sprite
-    if mario_is_jumping:
-        t_mario[0] = SPRITE_MARIO_JUMP
-    else:
-        t_mario[0] = SPRITE_MARIO_WALK1 + mario_sprite_idx
+            if new_hour is None or NOW.tm_min == 0:
+                # print("NEW HOUR", new_hour)
+                ddmmyyyy = "{:0>2d}/{:0>2d}/{:0>4d}".format(
+                    NOW.tm_mday, NOW.tm_mon, NOW.tm_year
+                )
+                t_ddmmyyyy.text = ddmmyyyy
+                new_hour = ts
+
+    # Render/print debugging info
+    if DEBUG:
+        pass
+        # t_debug.text = "{:02d} {:02d}".format(scene_index, scene_frame)
+
+    ### MARIO HANDLING ###
 
     # Trigger Mario Jump
-    if frame % 64 == 28:
+    if mario_is_walking and scene_frame == 24:
         if not mario_is_jumping:
             mario_is_falling = False
             mario_is_jumping = True
@@ -263,17 +298,21 @@ while True:
     # Perform Mario Jump
     if mario_is_jumping and not mario_is_falling:
         mario_is_falling = True
-        t_mario.y = t_mario.y - mario_jump_height
+        mario_y = mario_y - mario_jump_height
 
     # Apply Gravity
     if mario_is_falling:
-        t_mario.y = int(t_mario.y + gravity)
+        mario_y = mario_y + gravity
 
     # Peform Mario Landing
-    if t_mario.y > mario_y_default:
-        t_mario.y = mario_y_default
+    if mario_y > mario_y_default:
+        mario_y = mario_y_default
         mario_is_falling = False
         mario_is_jumping = False
+
+    # Start Mario walking if not already after one scene
+    if not mario_is_walking and scene_index >= 1:
+        mario_is_walking = True
 
     # Animate Mario sprite (every 4th frame)
     if frame % 4 == 0:
@@ -281,21 +320,49 @@ while True:
         if mario_sprite_idx > 2:
             mario_sprite_idx = 0
 
-    # Scroll floors to left
-    if g_floor1.x <= -DISPLAY.width:
-        g_floor1.x = DISPLAY.width - 1
+    # Render Mario sprite
+    t_mario.y = int(mario_y)
+    if mario_is_jumping:
+        t_mario[0] = SPRITE_MARIO_JUMP
+    elif mario_is_walking:
+        t_mario[0] = SPRITE_MARIO_WALK1 + mario_sprite_idx
     else:
-        g_floor1.x = g_floor1.x - 1
+        t_mario[0] = SPRITE_MARIO_STILL
 
-    if g_floor2.x <= -DISPLAY.width:
-        g_floor2.x = DISPLAY.width - 1
-    else:
-        g_floor2.x = g_floor2.x - 1
+    ### DATE HANDLING ###
+
+    # Trigger date scroller
+    if mario_is_walking and scene_index % 8 == 0 and scene_frame == 0:
+        if not date_is_moving:
+            date_is_moving = True
+
+    if mario_is_walking and date_is_moving:
+        if t_ddmmyyyy.x <= -DISPLAY.width - 64:
+            t_ddmmyyyy.x = DISPLAY.width
+            date_is_moving = False
+        else:
+            t_ddmmyyyy.x = t_ddmmyyyy.x - 1
+
+    ### FLOOR HANDLING ###
+
+    # Scroll floors to left
+    if mario_is_walking:
+        if g_floor1.x <= -DISPLAY.width:
+            g_floor1.x = DISPLAY.width - 1
+        else:
+            g_floor1.x = g_floor1.x - 1
+
+        if g_floor2.x <= -DISPLAY.width:
+            g_floor2.x = DISPLAY.width - 1
+        else:
+            g_floor2.x = g_floor2.x - 1
+
+    ### END OF FRAME ###
 
     # Increment frame index
-    if frame >= (DISPLAY.width * 4) - 1:
+    if frame >= (DISPLAY.width * scene_count) - 1:
         frame = 0
     else:
         frame = frame + 1
 
-    # time.sleep(0.01 * ((60 - NOW.tm_sec) / 10))
+    time.sleep(0.02)
