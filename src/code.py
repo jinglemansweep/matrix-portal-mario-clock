@@ -253,7 +253,7 @@ while True:
 
     # Trigger Mario Jump
     if frame % 64 == 28:
-        if mario_is_jumping is False:
+        if not mario_is_jumping:
             mario_is_falling = False
             mario_is_jumping = True
 
@@ -262,15 +262,15 @@ while True:
         mario_is_falling = True
         t_mario.y = t_mario.y - mario_jump_height
 
+    # Apply Gravity
+    if mario_is_falling:
+        t_mario.y = int(t_mario.y + gravity)
+
     # Peform Mario Landing
     if t_mario.y > mario_y_default:
         t_mario.y = mario_y_default
         mario_is_falling = False
         mario_is_jumping = False
-
-    # Apply Gravity
-    if mario_is_falling:
-        t_mario.y = int(t_mario.y + gravity)
 
     # Animate Mario sprite (every 4th frame)
     if frame % 4 == 0:
@@ -279,9 +279,9 @@ while True:
             mario_sprite_idx = 0
 
     # Reset floors after scrolled out
-    if g_floor1.x < -64:
+    if g_floor1.x <= -64:
         g_floor1.x = 64
-    if g_floor2.x < -64:
+    if g_floor2.x <= -64:
         g_floor2.x = 64
 
     # Incremeent frame index
