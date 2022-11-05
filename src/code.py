@@ -27,8 +27,6 @@ except ImportError:
     print("WiFi secrets are kept in secrets.py, please add them there!")
     raise
 
-NETWORK = Network(status_neopixel=board.NEOPIXEL, debug=False)
-
 # CONSTANTS ----------------------------------------------------------------
 
 DEBUG = True
@@ -147,8 +145,10 @@ def parse_time(timestring, is_dst=-1):
 
 MATRIX = Matrix(bit_depth=BITPLANES)
 DISPLAY = MATRIX.display
+RTC_INST = RTC()
 ACCEL = adafruit_lis3dh.LIS3DH_I2C(busio.I2C(board.SCL, board.SDA), address=0x19)
 _ = ACCEL.acceleration  # Dummy reading to blow out any startup residue
+
 time.sleep(0.1)
 
 DISPLAY.rotation = (
@@ -163,11 +163,13 @@ DISPLAY.rotation = (
     % 4
 ) * 90
 
+time.sleep(3)
+NETWORK = Network(status_neopixel=board.NEOPIXEL, debug=False)
+
 nes_font = bitmap_font.load_font("/nes.bdf")
 bitocra_font = bitmap_font.load_font("/bitocra7.bdf")
 spritesheet, palette = adafruit_imageload.load(SPRITESHEET_FILENAME)
 
-rtc = RTC()
 
 # DISPLAYIO PRIMITIVES -----------------------------------------------------
 
@@ -212,6 +214,11 @@ g_root.append(g_clock)
 last_ntp_check = None
 frame = 0
 mario_sprite_idx = 0
+gravity = 1
+mario_y_default = t_mario.y
+mario_jump_height = 9
+mario_is_jumping = False
+mario_is_falling = False
 
 DISPLAY.show(g_root)
 
@@ -219,14 +226,14 @@ gc.collect()
 
 while True:
 
-    NOW = rtc.datetime
+    NOW = RTC_INST.datetime
     TICK = supervisor.ticks_ms()
     if last_ntp_check is None or time.monotonic() > last_ntp_check + 3600:
         try:
             gc.collect()
             ntp_time = NETWORK.get_local_time()
             print("NTP Time", ntp_time)
-            rtc.datetime = parse_time(ntp_time)
+            RTC_INST.datetime = parse_time(ntp_time)
             last_ntp_check = time.monotonic()
         except Exception as e:
             print("NTP Error, retrying...", e)
@@ -235,20 +242,49 @@ while True:
     t_hhmmss.text = hhmmss
     g_floor1.x = g_floor1.x - 1
     g_floor2.x = g_floor2.x - 1
-    t_mario[0] = SPRITE_MARIO_WALK1 + mario_sprite_idx
-    frame = frame + 1
+    if mario_is_jumping:
+        t_mario[0] = SPRITE_MARIO_JUMP
+    else:
+        t_mario[0] = SPRITE_MARIO_WALK1 + mario_sprite_idx
 
-    if frame > 999:
+    # Handle frame loop
+    if frame > 9999:
         frame = 0
 
+    # Trigger Mario Jump
+    if frame % 64 == 28:
+        if mario_is_jumping is False:
+            mario_is_falling = False
+            mario_is_jumping = True
+
+    # Perform Mario Jump
+    if mario_is_jumping and not mario_is_falling:
+        mario_is_falling = True
+        t_mario.y = t_mario.y - mario_jump_height
+
+    # Peform Mario Landing
+    if t_mario.y > mario_y_default:
+        t_mario.y = mario_y_default
+        mario_is_falling = False
+        mario_is_jumping = False
+
+    # Apply Gravity
+    if mario_is_falling:
+        t_mario.y = int(t_mario.y + gravity)
+
+    # Animate Mario sprite (every 4th frame)
     if frame % 4 == 0:
         mario_sprite_idx = mario_sprite_idx + 1
         if mario_sprite_idx > 2:
             mario_sprite_idx = 0
 
+    # Reset floors after scrolled out
     if g_floor1.x < -64:
         g_floor1.x = 64
     if g_floor2.x < -64:
         g_floor2.x = 64
 
-    time.sleep(0.001)
+    # Incremeent frame index
+    frame = frame + 1
+
+    time.sleep(0.02)
